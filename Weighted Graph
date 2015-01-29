@@ -1,0 +1,230 @@
+#ifndef WEIGHTED_GRAPH_H
+#define WEIGHTED_GRAPH_H
+
+#include <iostream>
+#include <limits>
+#include "Exception.h"
+#include <queue>
+using std::queue;
+/*****************************************
+ * UW User ID:  t93zhang
+ * Submitted for ECE 250
+ * Semester of Submission:  (Fall) 2014
+ *
+ * By submitting this file, I affirm that
+ * I am the author of all modifications to
+ * the provided code.
+ *****************************************/
+
+class Weighted_graph {
+private:
+    static const double INF;
+    int     *matrixDegrees;     // an pointer to an array that hold the degrees for each node.
+    int     eCount;             // edge count
+    int     matrixN;            // the size of array
+    double **graph_matrix;      // holds the 2D adjacent array
+    
+public:
+    Weighted_graph( int = 50 );
+    ~Weighted_graph();
+    
+    int degree( int ) const;
+    int edge_count() const;
+    double adjacent( int, int ) const;
+    double minimum_spanning_tree( int ) const;
+    bool is_connected() const;
+    
+    void insert( int, int, double );
+    
+    // Friend
+    friend std::ostream &operator << ( std::ostream &, Weighted_graph const & );
+};
+
+const double Weighted_graph::INF = std::numeric_limits<double>::infinity();
+
+//Weighted_graph:Constuctor (function creates a new 2D array)
+//~Weighted_graph():Destructor, clears all allocated memory
+//degree: Returns the number of degrees in the graph. (O(1))
+//edge_count: Returns the number of edges in the graph. (O(1))
+//Adjacent: Returns the weight of the edge connecting vertices m and n.
+//is_connected: Returns a boolean that determines if the graph is connected.
+//minimum_spanning_tree: Determines the minimum weight of the span tree starting at node m.
+//insert: Tries to insert a weight from node n to m.
+
+Weighted_graph::Weighted_graph( int n ):
+graph_matrix(new double *[n]),
+matrixDegrees(new int[n]),
+eCount(0),
+matrixN(n){
+    if (n < 0)
+        throw illegal_argument();
+
+    //This first loop makes the adjacent matrix into a 2D array
+    for (int i = 0; i < n; ++i) {
+        graph_matrix[i] = new double[n];
+        matrixDegrees[i] = 0;
+    }
+    
+    //This second for loop set all elements of the matrix to INF
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            graph_matrix[i][j] = INF;
+            
+        }
+        graph_matrix[i][i] = 0;
+    }
+    
+}
+
+Weighted_graph::~Weighted_graph() {
+    for (int i = 0; i < matrixN; i++) {
+        delete [] graph_matrix[i];
+    }
+    delete [] graph_matrix;
+    delete [] matrixDegrees;
+}
+
+int Weighted_graph::degree( int vn ) const {
+    
+    if(matrixN <= vn || vn < 0) {
+        throw illegal_argument();
+    }
+    return matrixDegrees[vn];
+}
+
+int Weighted_graph::edge_count() const {
+    return eCount;
+}
+
+double Weighted_graph::adjacent ( int n, int m ) const {
+    if (n >= matrixN || m >= matrixN || n < 0 || m < 0)
+        throw illegal_argument();
+    else if (n == m) // this means we have no edges directed back to itself
+        return 0;
+    else if (graph_matrix[n][m] == INF)
+        return INF;
+    else
+        graph_matrix[n][m];
+}
+
+bool Weighted_graph::is_connected() const {
+    if (matrixN == 0)
+        return false;
+    queue<int> Q;
+    bool *bfsVisited = new bool [matrixN];
+    
+    for (int i = 0; i < matrixN; i++) {
+        bfsVisited[i] = false;
+    }
+    
+    bfsVisited[0] = true;
+    
+    Q.push(0);
+    while (Q.empty() == false) {
+        int curr= Q.front();
+        for (int i = 0; i < matrixN; i++) {
+            
+            if (graph_matrix[curr][i] != INF && !bfsVisited[i]) {
+                Q.push(i);
+                bfsVisited[i]=true;
+            }
+        }
+        Q.pop();
+    }
+    for (int i = 0; i < matrixN; i++) {
+        if (bfsVisited[i] == false)
+        {
+            delete [] bfsVisited;
+            return false;
+        }
+    }
+    delete [] bfsVisited;
+    return true;
+}
+
+
+double Weighted_graph::minimum_spanning_tree( int m ) const{
+    if (matrixN <= m || m < 0) {
+        throw illegal_argument();
+    }
+    int allVisited = 0;
+    double *d = new double [matrixN];
+    bool *v = new bool [matrixN];
+    double minSum = 0;
+    for (int i = 0; i < matrixN; i++) {
+        d[i]= INF;
+        v[i]= false;
+    }
+    d[m] = 0;
+    while (allVisited != matrixN-1) {
+        // extract min
+        double min_val = INF;
+        int min_index = 0;
+        for (int i = 0; i < matrixN; i++) {
+            if (min_val > d[i] && v[i] == false)
+            {
+                min_val = d[i];
+                min_index = i;
+            }
+        }
+        if (min_val == INF)
+            break;
+        // at this point the index with the smallest weight us found
+        v[min_index] = true;
+        //finding adj nodes
+        for (int j = 0; j < matrixN; j++) {
+            if (graph_matrix[min_index][j] < d[j] && v[j] == false) {
+                d[j] = graph_matrix[min_index][j];
+            }
+        }
+        
+        allVisited++;
+    }
+    for (int i = 0; i < matrixN; i++) {
+        if (d[i] != INF)
+            minSum = minSum + d[i];
+    }
+    delete [] v;
+    delete [] d;
+    return minSum;
+}
+
+void Weighted_graph::insert(int m, int n, double w ) {
+    //Condition IlLegal Arguement: input is invalid
+    if (w < 0 || w == INF || m < 0 || n < 0 || m >= matrixN || n >= matrixN)
+        throw illegal_argument();
+    //Condition erase edge: set weight between n and m to INF
+    else if (w == 0) {
+        if (graph_matrix[m][n] != INF) {
+            eCount--;
+            graph_matrix[m][n] = INF;
+            graph_matrix[n][m] = INF;
+            matrixDegrees[n] = matrixDegrees[n]-1;
+            matrixDegrees[m] = matrixDegrees[m]-1;
+        }
+    }
+    //Condition normal: m, n, w are within desided range
+    else {
+        if (graph_matrix[n][m] == INF) {
+            eCount++;
+            matrixDegrees[n] = matrixDegrees[n]+1;
+            matrixDegrees[m] = matrixDegrees[m]+1;
+        }
+        graph_matrix[m][n] = w;
+        graph_matrix[n][m] = w;
+    }
+}
+
+std::ostream &operator << ( std::ostream &out, Weighted_graph const &graph ) {
+    for (int i = 0 ; i < graph.matrixN; i++) {
+        for (int j = 0 ; j < graph.matrixN; j++) {
+            //adjacency matrix
+            out << graph.graph_matrix[i][j] << std::endl;
+            
+        }
+    }
+    out << std::endl;
+    return out;
+}
+
+#endif
