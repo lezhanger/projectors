@@ -1,0 +1,201 @@
+#ifndef DEQUE_AS_ARRAY_H
+#define DEQUE_AS_ARRAY_H
+
+#include "Exception.h"
+#include <iostream>
+using namespace std;
+
+class Deque_as_array {
+	private:
+		int array_size;
+		int*array;
+		int ihead;
+		int itail;
+		int count; // is it to count how many elements are added there are the in array. The capacity method returns the count
+
+	public:
+		Deque_as_array( int = 10 );
+		~Deque_as_array(); // the tilde is the destructor, it destroys the instance, frees up memory, it is also for the NOT operation of bitwise values.
+
+		int head() const;
+		int tail() const;
+		int size() const;
+		bool empty() const;
+		int capacity() const;
+
+		void enqueue_head( int const & );
+		void enqueue_tail( int const & );
+		int dequeue_head();
+		int dequeue_tail();
+		void clear();
+        void print();
+    
+};
+
+//Function for creating a new array
+Deque_as_array::Deque_as_array( int n ):
+array_size( std::max( 1, n ) ), // take the max of 1 or n this prevent the case of where n<1
+array( new int[array_size] ),   // array is a newly created array set with array_size
+count( 0 ) {                    // count is set to 0
+    ihead = 0;                  //set ihead to 0
+    itail = 0;                  //set itail to 0
+}
+
+//Function for deleting an array
+Deque_as_array::~Deque_as_array() {
+    delete [] array;
+}
+
+//Function which returns the int value of count (this is how many elements are used)
+int Deque_as_array::size() const {
+	return count;
+}
+
+//Function which returns the int value of array size (total capacity of the array (n))
+int Deque_as_array::capacity() const {
+	return array_size;
+}
+
+//Function which returns a 1 (true) or 0 (false) when checking if the array is empty
+bool Deque_as_array::empty() const {
+    if (count == 0)
+        return true;
+    else
+        return false;
+}
+
+//Function which reutrns the value of the element at index head
+int Deque_as_array::head() const {
+	// if array is empty then it is a underflow
+    if (count == 0)
+        throw underflow();
+    else
+        return array[ihead];
+}
+
+//Function which reutrns the value of the element at index tail
+int Deque_as_array::tail() const {
+    // if array is empty then it is a underflow
+    if (count == 0)
+        throw underflow();
+    else
+        return array[itail];
+}
+
+//Function which stores element obj at the head of array
+void Deque_as_array::enqueue_head( int const &obj ) {
+    // condition check if full, throw overflow exception
+    if (count == array_size)
+        throw overflow();
+    //if array empty then index head and tail remain the same
+    else if (ihead == itail && count == 0)
+    {
+        array[ihead] = obj;
+        count++;
+    }
+    else
+    {
+        //if head index is zero we set the head index to the end of the array (circling formation)
+        if (ihead == 0)
+            ihead = array_size-1;
+        //head is decremented and new element value is added
+        else
+            ihead--;
+        array[ihead]= obj;
+        count++;
+    }
+}
+
+//Function which stores element obj at the tail of array
+void Deque_as_array::enqueue_tail( int const &obj ) {
+    // condition check if full, throw overflow exception
+    if (count == array_size)
+        throw overflow();
+    //if array empty then index head and tail remain the same
+    else if (ihead == itail && count == 0)
+    {
+        array[ihead] = obj;
+        count++;
+    }
+    else
+    {
+        //if tail index is at the end of array, we set tail index to 0 (circling formation)
+        if (itail == array_size-1)
+            itail=0;
+        //tail is incemented and new element value is added
+        else
+            itail++;
+        array[itail]= obj;
+        count++;
+    }
+}
+
+//Function
+int Deque_as_array::dequeue_head() {
+    // condition check if empty, throw underflow exception
+    if (count == 0)
+        throw underflow();
+    //if there is only one element in the array, we want ihead and itail to not change.
+    else if (count ==1)
+    {
+        count--;
+        return array[ihead];
+    }
+    else
+    {
+        //popValue is a temporary file that stores the dequeue element's value
+        int popValue = array[ihead];
+        //if head index is at the end of array, we want it to circle back to beginning of array
+        if (ihead == array_size-1)
+            ihead = 0;
+        else
+            ihead++;
+        count--;
+        return popValue;
+    }
+
+}
+
+//Function removed a element from a tail and returns the value of the element
+int Deque_as_array::dequeue_tail() {
+    // condition check if empty, throw underflow exception
+    if (count == 0)
+        throw underflow();
+    //if there is only one element in the array, we want ihead and itail to not change.
+    else if (count == 1)
+    {
+        count--;
+        return array[ihead];
+    }
+    else
+    {
+        //popValue is a temporary file that stores the dequeue element's value
+        int popValue = array[itail];
+        //if tail index is zero, we want it to circle back to the end of the array
+        if (itail == 0)
+            itail = array_size-1;
+        else
+            itail--;
+        count--;
+        return popValue;
+    }
+}
+
+//Function clears array, by setting count, ihead and itail to zero
+void Deque_as_array::clear() {
+    count = 0;
+    ihead = 0;
+    itail = 0;
+}
+
+//Function that does nothing, just used for the given testing files to work
+void Deque_as_array::print()
+{
+}
+
+
+
+// Is an error showing up in ece250.h or elsewhere?
+// Did you forget a closing '}' ?
+
+#endif
