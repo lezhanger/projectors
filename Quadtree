@@ -1,0 +1,172 @@
+#ifndef QUADTREE_H
+#define QUADTREE_H
+
+#include "ece250.h"
+#include "Quadtree_node.h"
+#include "Exception.h"
+#include <iostream>
+
+template <typename T>
+class Quadtree {
+	private:
+		Quadtree_node<T> *tree_root;
+		int count;
+
+	public:
+		Quadtree();
+		~Quadtree();
+
+		// Accessors
+
+		int size() const;
+		bool empty() const;
+
+		T min_x() const;
+		T min_y() const;
+
+		T max_x() const;
+		T max_y() const;
+
+		T sum_x() const;
+		T sum_y() const;
+
+		Quadtree_node<T> *root() const;
+		bool member( T const &, T const & ) const;
+
+		// Mutators
+
+		void insert( T const &, T const & );
+		void clear();
+
+	
+};
+
+template <typename T>
+Quadtree<T>::Quadtree():
+tree_root( 0 ),
+count( 0 ) {
+    // empty constructor
+}
+
+//Destructor: calls it's clear function
+template <typename T>
+Quadtree<T>::~Quadtree() {
+    clear();
+}
+
+//Function size: returns count
+template <typename T>
+int Quadtree<T>::size() const {
+	return count; // where count is the number of items in the Quadtree
+}
+
+//Function empty: return true if tree is empty, and false otherwise
+template <typename T>
+bool Quadtree<T>::empty() const {
+    if (count == 0)
+        return 1;
+    else
+        return 0;
+}
+
+//Function min_y: calls Quadtree_node's min_x
+template <typename T>
+T Quadtree<T>::min_x() const {
+	if (tree_root == 0)
+        throw underflow();
+    return tree_root->min_x();
+
+}
+
+//Function min_y: calls Quadtree_node's min_y
+template <typename T>
+T Quadtree<T>::min_y() const {
+    if (tree_root == 0)
+        throw underflow();
+    return tree_root->min_y();
+}
+
+//Function max_x: calls Quadtree_node's max_x
+template <typename T>
+T Quadtree<T>::max_x() const {
+    if (tree_root == 0)
+        throw underflow();
+    return tree_root->max_x();
+}
+
+//Function max_y: calls Quadtree_node's max_y
+template <typename T>
+T Quadtree<T>::max_y() const {
+    if (tree_root == 0)
+        throw underflow();
+    return tree_root->max_y();
+}
+
+//Function sum_ x: calls Quadtree_node's sum_x
+template <typename T>
+T Quadtree<T>::sum_x() const {
+    if (empty())
+        return 0;
+    else
+        return tree_root->sum_x();
+}
+
+//Function sum_y: calls Quadtree_node's sum_y
+template <typename T>
+T Quadtree<T>::sum_y() const {
+	if (empty())
+        return 0;
+    else
+        return tree_root->sum_y();
+}
+
+//Fuction root: returns 0 if empty, else returns address of tree_root
+template <typename T>
+Quadtree_node<T> *Quadtree<T>::root() const {
+	if (empty())
+        return 0;
+    else
+        return tree_root;
+}
+
+//Function member: calls Quadtree_node's member
+template <typename T>
+bool Quadtree<T>::member( T const &x, T const &y ) const {
+	if (count == 0)
+        return false;
+    else
+        return tree_root->member(x,y);
+}
+
+//Function insert: calls Quadtree_node's insert and increments count if insert
+//                  is successful.
+template <typename T>
+void Quadtree<T>::insert( T const &x, T const &y ) {
+    if (count == 0)
+    {
+        tree_root = new Quadtree_node<T>(x,y);
+        count++;
+    }
+    else if (tree_root->insert(x,y) == true)
+    {
+        count++;
+    }
+    else;
+    
+}
+
+//Fuction clear: calls Quadtree_node's clear and set tree_root and count to zero
+template <typename T>
+void Quadtree<T>::clear() {
+    tree_root->clear();
+    delete tree_root; //Delete the root node
+    tree_root=0;
+    count = 0;
+}
+
+
+
+// Is an error showing up in ece250.h or elsewhere?
+// Did you forget a closing '}' ?
+
+#endif
