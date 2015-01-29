@@ -1,0 +1,256 @@
+;*-------------------------------------------------------------------
+;* Name:    	lab_4_program.s 
+;* Purpose: 	To understand interrupts
+;* Term:		Winter 2013
+;*-------------------------------------------------------------------
+				THUMB 								; Declare THUMB instruction set 
+				AREA 	My_code, CODE, READONLY 	; 
+				EXPORT 		__MAIN 					; Label __MAIN is used externally 
+				EXPORT		EINT3_IRQHandler		; the ISR will be known to the startup_LPC17xx.s program
+				ENTRY 
+
+__MAIN
+
+; The following lines are similar to previous labs.
+; They just turn off all LEDs 
+				LDR			R10, =LED_BASE_ADR		; R10 is a  pointer to the base address for the LEDs
+				MOV 		R3, #0xB0000000			; Turn off three LEDs on port 1  
+				STR 		R3, [r10, #0x20]
+				MOV 		R3, #0x0000007C
+				STR 		R3, [R10, #0x40] 		; Turn off five LEDs on port 2 
+
+; This line is very important in your main program
+; Initializes R11 to a 16-bit non-zero value and NOTHING else can write to R11 !!
+				MOV			R11, #0xABCD			; Init the random number generator with a non-zero number
+LOOP 			BL 			RNG  
+				
+				;Enable interrupt handler
+				MOV			R6, #0x1				; Register used as an interrupt flag 
+				LDR			R7, =ISER0				
+				LDR 		R5, [R7]
+				ORR			R5, R5, #0x200000		; Set 22nd bit to 1
+				STR			R5, [R7]					
+				
+				;Enable interrupt on INT0 button press
+				LDR 		R7, =IO2IntEnf
+				LDR			R4, [R7]
+				ORR			R4, R4, #0x400			; Set 11th bit to 1
+				STR			R4, [R7]
+				
+				;Random delay 2s - 10s with LED_LEFT and LED_RIGHT flashing
+				MOV			R0, #250
+				MOV			R1, R11					; Loading our random number into R0 which controls the delay time 
+				BFC			R1, #5, #27				; Clear all but the lowest 5 bits of R0			
+				ADD			R1, R1, #8
+
+; LED alternating flashing pattern
+Swap_Loop
+				BL			LED_LEFT
+				BL			DELAY				
+				
+				SUBS		R1, #1
+				BEQ			LED_FLASH
+				
+				BL			LED_RIGHT
+				BL			DELAY
+				
+				SUBS		R1, #1
+				BEQ			LED_FLASH
+				
+				B			Swap_Loop
+				
+				B 			LOOP
+
+; Display upper 4 bits as 1's
+LED_LEFT		STMFD		R13!, {R3, R14}
+
+				MOV 		R3, #0x0F
+				BL			DISPLAY_NUM
+				
+				LDMFD		R13!, {R3, R15}
+
+; Display lower 4 bits as 1's
+LED_RIGHT		STMFD		R13!, {R3, R14}
+
+				MOV 		R3, #0xF0
+				BL			DISPLAY_NUM
+
+				LDMFD		R13!, {R3, R15}
+
+;*------------------------------------------------------------------- 
+; Subroutine LED_FLASH: quickly blinks all LEDs at ~15 Hz
+;*------------------------------------------------------------------- 
+LED_FLASH		STMFD		R13!, {R0-R3, R14}
+
+				MOV 		R0, #1
+				;Time counter in ms
+				MOV			R1, #0xFFFFFFFF
+LED_ON		
+				;LEDs ON
+				MOV 		R3, #0x00000000
+				BL			DISPLAY_NUM
+				B			LED_DELAY
+				
+LED_OFF
+				;LEDs OFF
+				MOV			R3, #0xFFFFFFFF
+				BL			DISPLAY_NUM
+				B			LED_DELAY
+
+; Loops every 1 ms, alternates going into LED_ON and LED_OFF every 32 ms
+LED_DELAY
+				BL			DELAY
+				SUB			R1, #1 ; Decrementing counter every 1 ms
+				
+				TEQ			R6, #0 ; Check if interrupt has been executed
+				BEQ			DISPLAY_COUNTER ; If interrupt handled, go to display final counter value
+				
+				; Checks lower 6 bits of counter - if all 0's, turn LEDs off (executes every 64ms)
+				MOV			R2, #0x3F 
+				ANDS		R2, R1
+				BEQ			LED_OFF
+				
+				; Checks lower 5 bits of counter - if all 0's, turn LEDs on (executes every 64ms)
+				MOV			R2, #0x1F
+				ANDS		R2, R1
+				BEQ			LED_ON
+				
+				B			LED_DELAY
+				
+DISPLAY_COUNTER	
+				MOV			R3, R1					; R3 is the register that DISPLAY_NUM displays
+				BL			DISPLAY_NUM				; Display bottom 8 bits
+				MOV 		R0, #2000				; Display for 2s each
+				BL			DELAY
+				
+				ROR			R3, #8					; Shift to the next 8 bits
+				BL			DISPLAY_NUM
+				BL			DELAY		
+				
+				ROR			R3, #8					; Shift to the next 8 bits
+				BL			DISPLAY_NUM
+				BL			DELAY		
+				
+				ROR			R3, #8					; Shift to the next 8 bits
+				BL			DISPLAY_NUM
+				BL			DELAY
+				
+				ROR			R3, #8					; Shift to next 8 bits in anticipation of repeating the bottom 8 bits
+				
+				MOV			R0, #5000 				; Delay 5s before resetting
+				BL 			DELAY
+				
+				B			DISPLAY_COUNTER
+
+				LDMFD		R13!, {R0-R3, R15}
+
+;*------------------------------------------------------------------- 
+; Subroutine DISPLAY_NUM
+;*------------------------------------------------------------------- 
+; Display the number in R3 onto the 8 LEDs **NOTE: Reversed bit-mapping
+; Eg. 0 = 1, 1 = 0
+DISPLAY_NUM		STMFD		R13!,{R1, R2, R9, R14}
+				
+				;Lower 5 bits
+				MOV			R2, #0				
+				RBIT		R9, R3				; Reverse bits of counter and store into R9
+				BFC			R9, #0, #27			; Clear the lower 27 bits
+				EOR			R2, R2, R9			
+				LSR			R2, #25				; Shift so they are in the correct position for port mapping
+				
+				STR			R2, [R10, #0x40]	
+				
+				;6th bit
+				MOV			R2, #0x40000000 	; 0100 position for port mapping position
+				RBIT		R9, R3				;	
+				BFC			R9, #0, #26			; Clear the lower 26 bits
+				BFC			R9, #27, #5			; Clear higher 5 bits
+				LSL			R9, #5				; Shift so they are in the correct position for port mapping
+				EOR			R2, R2, R9
+				
+				;Higher 2 bits
+				RBIT		R9, R3
+				BFC			R9, #0, #24			; Clear the lower 26 bits
+				BFC			R9, #26, #6			; Clear higher 6 bits
+				LSL			R9, #4				; Shift so they are in the correct position for port mapping
+				EOR			R2, R2, R9
+				
+				STR			R2, [R10, #0x20] 	; Storing to address contolling the LEDs
+				
+; Useful commaands:  RBIT (reverse bits), BFC (bit field clear), LSR & LSL to shift bits left and right, ORR & AND and EOR for bitwise operations
+				
+				LDMFD		R13!,{R1, R2, R9, R15}
+				
+;*------------------------------------------------------------------- 
+; Subroutine RNG ... Generates a pseudo-Random Number in R11 
+;*------------------------------------------------------------------- 
+; R11 holds a random number as per the Linear feedback shift register (Fibonacci) on WikiPedia
+; R11 MUST be initialized to a non-zero 16-bit value at the start of the program
+; R11 can be read anywhere in the code but must only be written to by this subroutine
+RNG 			STMFD		R13!,{R1-R3, R14} 	; Random Number Generator 
+				AND			R1, R11, #0x8000
+				AND			R2, R11, #0x2000
+				LSL			R2, #2
+				EOR			R3, R1, R2
+				AND			R1, R11, #0x1000
+				LSL			R1, #3
+				EOR			R3, R3, R1
+				AND			R1, R11, #0x0400
+				LSL			R1, #5
+				EOR			R3, R3, R1			; The new bit to go into the LSB is present
+				LSR			R3, #15
+				LSL			R11, #1
+				ORR			R11, R11, R3
+				LDMFD		R13!,{R1-R3, R15}
+
+;*------------------------------------------------------------------- 
+; Subroutine DELAY ... Causes a delay of 1ms * R0 times
+;*------------------------------------------------------------------- 
+; 		aim for better than 10% accuracy
+DELAY			STMFD		R13!,{R2, R14}
+MultipleDelay		TEQ		R0, #0				; Test R0 to see if it's 0 - set Zero flag so you can use BEQ, BNE
+					BEQ 	exitDelay
+					MOV 	R2, #0x00000582		; Approx 1ms
+					MUL		R2, R0, R2
+DelayLoop			SUBS	R2, #1
+					BNE 	DelayLoop
+exitDelay		LDMFD		R13!,{R2, R15}
+
+; The Interrupt Service Routine MUST be in the startup file for simulation 
+;   to work correctly.  Add it where there is the label "EINT3_IRQHandler
+;
+;*------------------------------------------------------------------- 
+; Interrupt Service Routine (ISR) for EINT3_IRQHandler 
+;*------------------------------------------------------------------ 
+; This ISR handles the interrupt triggered when the INT0 push-button is pressed 
+; with the assumption that the interrupt activation is done in the main program
+EINT3_IRQHandler 	
+				STMFD 		R13!,{R0-R3, R14}				; Use this command if you need it  
+				
+					MOV		R6, #0							; Clear interrupt flag
+					LDR		R1, =IO2IntClr					; Load clear register address into R1
+					LDR 	R2, [R1]						; Load content of R1 into R2
+					ORR		R2, #0x400						; Set 11th bit of IO2IntClr to 1
+					STR		R2, [R1]						; Store resetted value into contents of R1
+
+				LDMFD 		R13!,{R0-R3, R15}				; Use this command if you used STMFD (otherwise use BX LR) 
+
+
+;*-------------------------------------------------------------------
+; Below is a list of useful registers with their respective memory addresses.
+;*------------------------------------------------------------------- 
+LED_BASE_ADR	EQU 	0x2009c000 		; Base address of the memory that controls the LEDs 
+PINSEL3			EQU 	0x4002C00C 		; Pin Select Register 3 for P1[31:16]
+PINSEL4			EQU 	0x4002C010 		; Pin Select Register 4 for P2[15:0]
+FIO1DIR			EQU		0x2009C020 		; Fast Input Output Direction Register for Port 1 
+FIO2DIR			EQU		0x2009C040 		; Fast Input Output Direction Register for Port 2 
+FIO1SET			EQU		0x2009C038 		; Fast Input Output Set Register for Port 1 
+FIO2SET			EQU		0x2009C058 		; Fast Input Output Set Register for Port 2 
+FIO1CLR			EQU		0x2009C03C 		; Fast Input Output Clear Register for Port 1 
+FIO2CLR			EQU		0x2009C05C 		; Fast Input Output Clear Register for Port 2 
+IO2IntEnf		EQU		0x400280B4		; GPIO Interrupt Enable for port 2 Falling Edge 
+ISER0			EQU		0xE000E100		; Interrupt Set-Enable Register 0 
+IO2IntClr       EQU     0x400280AC		; GPIO Interrupt Clear Register for port 2 Falling Edge 
+				ALIGN 
+
+				END 
