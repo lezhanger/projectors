@@ -1,0 +1,261 @@
+#ifndef DOUBLE_HASH_TABLE_H
+#define DOUBLE_HASH_TABLE_H
+
+/*****************************************
+ * UW User ID:  t93zhang
+ * Submitted for ECE 250
+ * Semester of Submission:  (Fall) 2014
+ *
+ * By submitting this file, I affirm that
+ * I am the author of all modifications to
+ * the provided code.
+ *****************************************/
+
+#include "Exception.h"
+#include "ece250.h"
+#include <iostream> // what is this for again??
+enum state { EMPTY, OCCUPIED, DELETED };
+
+template<typename T>
+class DoubleHashTable {
+	private:
+		int count;
+		int power;
+		int array_size;
+		T *array;
+		state *array_state;
+
+		int h1( T const & ) const; // first hash function
+		int h2( T const & ) const; // second hash function
+
+	public:
+		DoubleHashTable( int = 5 );
+		~DoubleHashTable();
+		int size() const;
+		int capacity() const;		
+		bool empty() const;
+		bool member( T const & ) const;
+		T bin( int ) const;
+
+		void print() const;
+
+		void insert( T const & );
+		bool remove( T const & );
+		void clear();
+};
+
+//Creates array and array state
+template<typename T >
+DoubleHashTable<T >::DoubleHashTable( int m ):
+count( 0 ), power( m ),
+array_size( 1 << power ),
+array( new T [array_size] ),
+array_state( new state[array_size] ) {
+
+	for ( int i = 0; i < array_size; ++i ) {
+		array_state[i] = EMPTY;
+	}
+}
+
+//Deletes array and array state
+template<typename T >
+DoubleHashTable<T >::~DoubleHashTable() {
+    //delete array
+	delete [] array;
+    
+    //delete the array of states
+	delete [] array_state;
+}
+
+// Function return count (which is how many elements are in the array)
+template<typename T >
+int DoubleHashTable<T >::size() const {
+	//return the number of elements in the array
+    return count;
+}
+
+// Function returns the size of the array
+template<typename T >
+int DoubleHashTable<T >::capacity() const {
+    // return the size of the array
+	return array_size;
+}
+
+// Function returns boolean of whether array is empty (true or false)
+template<typename T >
+bool DoubleHashTable<T >::empty() const {
+    // return true if count is zero
+    if ( count == 0 )
+		return true;
+    
+	// return false if not empty
+    else
+		return false;
+}
+
+// Function return the integer of calculated h1
+template<typename T >
+int DoubleHashTable<T >::h1( T const &obj ) const {
+	// calculate h1 value
+    int value = static_cast<int>(obj) % array_size;
+    
+	//if value is negative just add on the size of the array
+    if ( value < 0 )
+		value = value + array_size;
+	return value;
+}
+
+// Function return the integer of calculated h2
+template<typename T >
+int DoubleHashTable<T >::h2( T const &obj ) const {
+    // calculate h2 value
+	int value = ( static_cast<int>(obj) / array_size ) % array_size;
+    
+    // if the h2 value is negative, we add the size of the array to make it a positive value
+	if ( value  < 0 )
+		value = value +array_size;
+    
+    // if the calculated h2 value is even, we make it odd
+	if ( value % 2 == 0 )
+		value = value +1;
+	return value;
+}
+
+// Function check if obj is in array, and returns a true or false
+template<typename T >
+bool DoubleHashTable<T >::member( T const &obj ) const {
+    // function variables
+    int i = 1;
+    int v1 = h1(obj);
+    int v2 = h2(obj);
+    int h = v1;
+    
+    // Empty array case: Array is empty, return false
+	if (count == 0)
+		return false;
+    
+    // Empty state case: the array_state at h is zero,
+    //                  this means value was never added to array
+	else if ( array_state[h] == EMPTY )
+		return false;
+    
+	// Collision case: need to use h1 and h2
+	else
+	{
+		while ( i < array_size )
+        {
+            if ( array_state[h] == OCCUPIED && array[h] == obj )
+            {
+				return true;
+			}
+            i++;
+            h = ( v1 + i * v2 ) % array_size;
+		}
+	}
+	return false;
+}
+
+// Function reutrn the element at index n of the array
+template<typename T >
+T DoubleHashTable<T >::bin( int n ) const {
+    // return the value at array
+	return array[n];
+}
+
+// Function inserts a element into the array
+template<typename T >
+void DoubleHashTable<T >::insert( T const &obj ) {
+	// Function variables
+    int i = 1;
+    int v1 = h1(obj);
+    int v2 = h2(obj);
+    int h = v1;
+    bool found = false;
+    
+	// Full table case: throw overflow
+	if (count == array_size)
+		throw overflow();
+		
+	// Normal case: no collision insert using h1
+	if ( array_state[h] == EMPTY || array_state[h] == DELETED )
+	{
+		array[h] = obj;
+		array_state[h] = OCCUPIED;
+		count++;
+	}
+	// Collision case: need to use h1 and h2
+	else
+	{
+        while (array_state[h] == OCCUPIED && found == false)
+        {
+			h = ( v1 + i * v2 ) % array_size;
+			if ( array_state[h] == EMPTY || array_state[h] == DELETED )
+			{
+				array[h] = obj;
+				array_state[h] = OCCUPIED;
+                count++;
+                found = true;
+			}
+			i++;
+		}
+	}
+}
+
+// Function removes a element(the one passed in as a paramenter) from the array
+// and return whether removal was succesful
+template<typename T >
+bool DoubleHashTable<T >::remove( T const &obj ) {
+    // Function varriales
+    int i = 1;
+    int v1 = h1(obj);
+    int v2 = h2(obj);
+    int h = v1;
+    
+    // Empty case: return false
+    if ( count == 0 )
+        return false;
+
+	// Normal case: no collision, insert using h1
+	else if ( array_state[h] == OCCUPIED && array[h] == obj )
+	{
+		array_state[h] = DELETED;
+		count--;
+        return true;
+    }
+    
+	// Collision case: need to use h1 and h2
+	else
+	{
+		while ( i < array_size )
+        {
+			h = ( v1 + i * v2 ) % array_size;
+			if ( array_state[h] == OCCUPIED && array[h] == obj )
+			{
+				array_state[h] = DELETED;
+				count--;
+                return true;
+			}
+			i++;
+		}
+	}
+    return false;
+}
+
+// Function clears array by setting all array states to EMPTY
+template<typename T >
+void DoubleHashTable<T >::clear() {
+    // Changing everything in the array state to be empty
+	for ( int i = 0; i < array_size; i++ ) {
+		array_state[i] = EMPTY;
+	}
+    //set count to zero
+    count = 0;
+}
+
+template<typename T >
+void DoubleHashTable<T >::print() const {
+    // enter your implemetation here
+	return;
+}
+
+#endif
